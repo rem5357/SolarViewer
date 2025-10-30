@@ -37,6 +37,13 @@ enum Commands {
         output: String,
     },
 
+    /// Analyze multi-star systems in an Astrosynthesis file
+    Multistar {
+        /// Path to the .AstroDB file
+        #[arg(short, long)]
+        file: String,
+    },
+
     /// Extract data from an Astrosynthesis file and load into PostgreSQL
     Import {
         /// Path to the .AstroDB file
@@ -128,6 +135,11 @@ fn main() -> Result<()> {
             println!("✓ Star extraction complete!");
             println!("  Stars extracted: {}", stars.len());
             println!("  CSV file: {}", output);
+        }
+
+        Commands::Multistar { file } => {
+            info!("Analyzing multi-star systems in: {}", file);
+            extraction::analyze_multistar_systems(&file)?;
         }
 
         Commands::Import { file, name, database } => {
