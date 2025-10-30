@@ -1,0 +1,45 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Database files (don't commit actual Astrosynthesis files)
+*.AstroDB
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated documentation
+docs/SCHEMA.md
+
+# Output files
+*.svg
+*.png
+output/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+
+# PostgreSQL
+*.sql.bak
+
+# Benchmarks
+/target/criterion/
+
+# System files
+Thumbs.db
+desktop.ini

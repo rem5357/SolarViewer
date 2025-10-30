@@ -1,0 +1,51 @@
+[package]
+name = "solarviewer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "Extract and visualize stellar cartography data from Astrosynthesis"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/SolarViewer"
+
+[[bin]]
+name = "solarviewer"
+path = "src/main.rs"
+
+[dependencies]
+# SQLite access for Astrosynthesis .AstroDB files
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# PostgreSQL + async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-postgres = "0.7"
+postgres = "0.19"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+anyhow = "1.0"
+
+# Graph processing for layout algorithms
+petgraph = "0.6"
+
+# Linear algebra for PCA and transformations
+nalgebra = "0.32"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "layout_benchmarks"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
