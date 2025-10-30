@@ -1,0 +1,1 @@
+- Always check the .md files in the root project folder and subdirectories upon starting a new session.

@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 
 mod schema;
+mod extraction;
 
 #[derive(Parser)]
 #[command(name = "solarviewer")]
@@ -22,6 +23,17 @@ enum Commands {
 
         /// Output path for schema documentation
         #[arg(short, long, default_value = "docs/SCHEMA.md")]
+        output: String,
+    },
+
+    /// Extract stars and save to CSV
+    Extract {
+        /// Path to the .AstroDB file
+        #[arg(short, long)]
+        file: String,
+
+        /// Output CSV file path
+        #[arg(short, long, default_value = "stars.csv")]
         output: String,
     },
 
@@ -91,6 +103,31 @@ fn main() -> Result<()> {
             println!("✓ Schema exploration complete!");
             println!("  Tables discovered: {}", tables.len());
             println!("  Documentation: {}", output);
+        }
+
+        Commands::Extract { file, output } => {
+            info!("Extracting stars from: {}", file);
+            info!("Output will be written to: {}", output);
+
+            // Open database and read stars
+            let reader = extraction::StarReader::new(&file)?;
+            info!("Connected to database");
+
+            // Count stars
+            let count = reader.count_stars()?;
+            info!("Found {} stars", count);
+
+            // Read all stars
+            let stars = reader.read_all_stars()?;
+            info!("Read {} stars", stars.len());
+
+            // Export to CSV
+            extraction::export_stars_to_csv(&stars, &output)?;
+            info!("Stars exported to CSV: {}", output);
+
+            println!("✓ Star extraction complete!");
+            println!("  Stars extracted: {}", stars.len());
+            println!("  CSV file: {}", output);
         }
 
         Commands::Import { file, name, database } => {
