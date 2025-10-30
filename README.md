@@ -48,7 +48,7 @@ PostgreSQL + PostGIS
 ### Build from Source
 
 ```bash
-git clone https://github.com/yourusername/SolarViewer.git
+git clone https://github.com/rem5357/SolarViewer.git
 cd SolarViewer
 cargo build --release
 ```

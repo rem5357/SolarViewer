@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "Extract and visualize stellar cartography data from Astrosynthesis"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/SolarViewer"
+repository = "https://github.com/rem5357/SolarViewer"
 
 [[bin]]
 name = "solarviewer"
