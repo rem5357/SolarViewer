@@ -602,6 +602,57 @@ font_size = 10
 
 ---
 
+## Development Workflow
+
+### Session Continuity
+
+This section contains important information for maintaining context across development sessions.
+
+**Screenshot Directory**:
+- Location: `D:\dropbox\screenshots`
+- Screenshots are automatically stored here
+- User will frequently reference screenshots for visual communication
+- When user mentions "look at the SS" or "check the screenshot", refer to files in this directory
+
+**Development Practices**:
+- **Always rebuild after editing source files**: Run `cargo build` or `cargo run` after each code change to test
+- **Test incrementally**: Don't accumulate multiple changes before testing
+- **Verify compilation**: Ensure code compiles before moving to the next task
+- **Run the tool**: Execute commands to verify functionality works as expected
+
+**Typical Development Cycle**:
+1. Make code changes
+2. Run `cargo build --release` (or `cargo run -- [subcommand]` to build and test)
+3. Test the specific functionality changed
+4. Commit if working
+5. Move to next task
+
+**Build Commands**:
+```bash
+# Quick build (debug mode, faster compilation)
+cargo build
+
+# Optimized build (release mode, for performance testing)
+cargo build --release
+
+# Build and run with arguments
+cargo run -- schema --file test.AstroDB --output docs/SCHEMA.md
+
+# Run tests
+cargo test
+
+# Check for errors without building
+cargo check
+```
+
+**Testing Workflow**:
+- Keep a test .AstroDB file handy for quick iteration
+- Test each subcommand as it's implemented
+- Verify output files are generated correctly
+- Check error messages are helpful
+
+---
+
 ## Notes and Considerations
 
 ### Coordinate System Conversion
@@ -641,4 +692,4 @@ Design with these potential features in mind:
 
 **Last Updated**: 2025-10-30
 **Project Status**: Phase 1 - Schema Discovery (In Progress)
-**Repository**: https://github.com/[username]/SolarViewer (to be created)
+**Repository**: https://github.com/rem5357/SolarViewer
