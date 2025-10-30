@@ -20,7 +20,7 @@ Cargo.lock
 *.sqlite3
 
 # Generated documentation
-docs/SCHEMA.md
+# docs/ now tracked - schema docs are part of the project
 
 # Output files
 *.svg
