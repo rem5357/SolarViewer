@@ -6,11 +6,332 @@ SolarViewer is a Rust-based tool for extracting, storing, and visualizing stella
 
 ## Core Goals
 
-1. **Schema Extraction**: Map and document the complete Astrosynthesis SQLite schema
+1. **Schema Extraction**: Map and document the complete Astrosynthesis SQLite schema ✅ **COMPLETE**
 2. **Data Migration**: Extract data from .AstroDB files and migrate to PostgreSQL with PostGIS
 3. **Multi-File Management**: Store multiple "slices" (named subsets) from different Astrosynthesis files
 4. **2D Visualization**: Implement intelligent 2D projection of 3D stellar data using hybrid layout algorithms
 5. **Performance**: Avoid reloading Astrosynthesis files repeatedly by maintaining persistent PostgreSQL storage
+
+---
+
+## Project Status & Progress
+
+**Current Status**: Phase 1 Complete - Schema Exploration Tool Implemented
+**Last Session**: 2025-10-30
+**Repository**: https://github.com/rem5357/SolarViewer
+
+### Quick Start for New Sessions
+
+**Required Tools** (Installed):
+- **Rust 1.90.0** via rustup
+  - Location: `%USERPROFILE%\.cargo\bin\`
+  - Use: `"$USERPROFILE/.cargo/bin/cargo.exe" [command]` or restart terminal
+- **GitHub CLI 2.81.0**
+  - Location: `C:\Program Files\GitHub CLI\gh.exe`
+  - Authenticated as: **rem5357**
+  - Use: `"C:\Program Files\GitHub CLI\gh.exe" [command]` or restart terminal
+
+**Test Data**:
+- File: `TotalSystem.AstroDB` (in project root)
+- 14 tables, 627 bodies (stars/planets/moons), 45 routes
+- Schema documentation: `docs/SCHEMA.md` (498 lines)
+
+**Build & Test**:
+```bash
+# Build project (always after code changes)
+cargo build
+
+# Run schema exploration
+cargo run -- schema --file TotalSystem.AstroDB --output docs/SCHEMA.md
+
+# Check for errors without building
+cargo check
+```
+
+### Completed Work (Session 2025-10-30)
+
+#### Infrastructure Setup
+- [x] Created consolidated PROJECT.md merging AstroSQL.md and StarMap2D_Visualization.md
+- [x] Initialized Rust project structure with Cargo.toml
+- [x] Created CLI skeleton with schema/import/map subcommands
+- [x] Set up git repository with .gitignore
+- [x] Installed GitHub CLI (gh) via winget
+- [x] Authenticated GitHub CLI as rem5357
+- [x] Created GitHub repository: https://github.com/rem5357/SolarViewer
+- [x] Pushed initial code to GitHub
+- [x] Installed Rust 1.90.0 via rustup
+- [x] Added development workflow notes to PROJECT.md
+
+#### Phase 1: Schema Exploration (COMPLETE)
+- [x] Created `src/schema/mod.rs` module structure
+- [x] Implemented `src/schema/discovery.rs`:
+  - SchemaExplorer connects to SQLite .AstroDB files
+  - Discovers all tables, columns, types, constraints
+  - Extracts foreign key relationships
+  - Samples data from each table
+  - Counts rows per table
+- [x] Implemented `src/schema/documentation.rs`:
+  - Generates comprehensive markdown documentation
+  - Table of contents with hyperlinks
+  - Summary statistics table
+  - Detailed column information with types and constraints
+  - Foreign key relationship display
+  - Sample data preview (5 rows per table)
+  - Text-based relationship diagram
+- [x] Integrated schema command into main.rs
+- [x] Added chrono dependency for timestamps
+- [x] Tested with TotalSystem.AstroDB - SUCCESS
+- [x] Generated docs/SCHEMA.md (498 lines)
+
+#### Key Findings from TotalSystem.AstroDB
+
+**Database Structure**:
+- **14 tables** discovered
+- **No formal foreign key constraints** (relationships via parent_id/system_id columns)
+- Hierarchical data model (parent_id references)
+
+**Critical Tables**:
+
+1. **bodies** (627 rows, 63 columns)
+   - All celestial objects: stars, planets, moons, asteroids, stations
+   - Columns: id, system_id, parent_id, name, type_id, body_type, spectral
+   - **3D Coordinates**: x, y, z (double precision, in light-years)
+   - Physical properties: distance, radius, density, mass, rotation
+   - Stellar properties: luminosity, temperature, spectral type
+   - Planetary properties: albedo, atmosphere, hydrosphere, greenhouse
+   - Orbital parameters: semi_major, eccentricity, inclination, long_asc_node
+   - Surface conditions: temp, pressure, gravity
+   - Life/habitability indicators
+
+2. **routes** (45 rows, 13 columns)
+   - Connections between star systems
+   - Columns: id, name, start_body_id, end_body_id, length, color
+   - Route metadata: hidden, locked, width, system_color
+
+3. **route_waypoints** (90 rows, 7 columns)
+   - Path details for routes
+   - Columns: route_id, sequence, x, y, z, label, locked
+
+4. **sector_info** (1 row, 36 columns)
+   - Overall sector metadata
+   - Map dimensions, projection settings, background images
+   - Default generation parameters
+
+5. **sector_views** (4 rows, 12 columns)
+   - Saved view configurations
+   - Camera position and orientation
+
+6. **subsectors** (0 rows, 22 columns)
+   - Grid-based spatial divisions (none in test file)
+
+7. **atm_components** (28 rows, 4 columns)
+   - Atmospheric gas composition for bodies
+   - Columns: id, body_id, gas, percent
+
+8. **system_data_config** (110 rows, 8 columns)
+   - Configuration/property definitions
+
+**Data Model Insights**:
+- Bodies are hierarchical: system_id (star) → parent_id (planet) → children (moons)
+- Stars have system_id = id (they are the system)
+- Planets have system_id = star.id, parent_id = star.id
+- Moons have system_id = star.id, parent_id = planet.id
+- Routes connect bodies via start_body_id/end_body_id
+- Coordinates are 3D Cartesian (x, y, z) in light-years from sector origin
+- Astrosynthesis uses rotated coordinate system vs standard Galactic
+
+**PostgreSQL Migration Considerations**:
+- Need to model hierarchical relationships explicitly
+- Add PostGIS geometry columns for spatial queries
+- Create indices on system_id, parent_id for joins
+- Consider partitioning bodies by type_id or body_type
+- Store original Astrosynthesis IDs for reference
+- Track source_file_id for multi-file management
+
+### Files Created This Session
+
+**Source Code**:
+- `src/main.rs` - CLI with clap, integrated schema command
+- `src/schema/mod.rs` - Module exports
+- `src/schema/discovery.rs` - Schema exploration (182 lines)
+- `src/schema/documentation.rs` - Markdown generation (125 lines)
+
+**Documentation**:
+- `PROJECT.md` - Comprehensive project document (this file)
+- `README.md` - User-facing documentation
+- `GITHUB_SETUP.md` - GitHub repository setup instructions
+- `docs/SCHEMA.md` - Generated schema documentation (498 lines)
+
+**Configuration**:
+- `Cargo.toml` - Rust dependencies and project metadata
+- `.gitignore` - Excludes .AstroDB files, target/, build artifacts
+
+**Reference Materials** (preserved):
+- `AstroSQL.md` - Astrosynthesis technical background
+- `StarMap2D_Visualization.md` - 2D projection algorithms
+
+### What Works Right Now
+
+```bash
+# Explore any .AstroDB file and generate documentation
+cargo run -- schema --file YourFile.AstroDB --output docs/OUTPUT.md
+
+# The tool will:
+# 1. Connect to the SQLite database
+# 2. Discover all tables and their structure
+# 3. Extract column types, constraints, primary keys
+# 4. Find foreign key relationships
+# 5. Count rows in each table
+# 6. Sample 5 rows from each table
+# 7. Generate comprehensive markdown documentation
+```
+
+### Next Steps (Phase 2: PostgreSQL Setup)
+
+**Immediate Tasks**:
+1. Design PostgreSQL schema based on Astrosynthesis findings
+2. Create SQL migration scripts
+3. Set up PostGIS extension
+4. Implement connection pooling
+5. Create basic CRUD operations for bodies, routes, sectors
+
+**PostgreSQL Schema Design** (from discovered structure):
+```sql
+-- Track source files for multi-file management
+CREATE TABLE source_files (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    original_path TEXT,
+    imported_at TIMESTAMP DEFAULT NOW(),
+    sector_name TEXT,
+    metadata JSONB
+);
+
+-- Star systems with PostGIS spatial support
+CREATE TABLE star_systems (
+    id SERIAL PRIMARY KEY,
+    source_file_id INTEGER REFERENCES source_files(id),
+    original_body_id INTEGER,  -- ID from Astrosynthesis bodies table
+    name TEXT,
+    position GEOMETRY(PointZ, 4326),  -- PostGIS 3D point
+    x DOUBLE PRECISION,
+    y DOUBLE PRECISION,
+    z DOUBLE PRECISION,
+    spectral_type TEXT,
+    luminosity DOUBLE PRECISION,
+    temperature DOUBLE PRECISION,
+    mass DOUBLE PRECISION,
+    radius DOUBLE PRECISION,
+    metadata JSONB,  -- Store all other Astrosynthesis fields
+    UNIQUE(source_file_id, original_body_id)
+);
+
+-- Planets
+CREATE TABLE planets (
+    id SERIAL PRIMARY KEY,
+    source_file_id INTEGER REFERENCES source_files(id),
+    star_system_id INTEGER REFERENCES star_systems(id) ON DELETE CASCADE,
+    original_body_id INTEGER,
+    name TEXT,
+    body_type TEXT,  -- terrestrial, gas giant, ice giant, etc.
+    parent_id INTEGER,  -- For moons of moons (rare but possible)
+
+    -- Orbital parameters
+    semi_major_axis_au DOUBLE PRECISION,
+    eccentricity DOUBLE PRECISION,
+    inclination DOUBLE PRECISION,
+
+    -- Physical properties
+    mass_earth_masses DOUBLE PRECISION,
+    radius_km DOUBLE PRECISION,
+    density DOUBLE PRECISION,
+    gravity DOUBLE PRECISION,
+
+    -- Surface conditions
+    temperature DOUBLE PRECISION,
+    atmospheric_pressure DOUBLE PRECISION,
+
+    metadata JSONB,
+    UNIQUE(source_file_id, original_body_id)
+);
+
+-- Moons (similar structure to planets)
+CREATE TABLE moons (
+    id SERIAL PRIMARY KEY,
+    source_file_id INTEGER REFERENCES source_files(id),
+    planet_id INTEGER REFERENCES planets(id) ON DELETE CASCADE,
+    star_system_id INTEGER REFERENCES star_systems(id) ON DELETE CASCADE,
+    original_body_id INTEGER,
+    name TEXT,
+
+    -- Orbital and physical properties
+    semi_major_axis_km DOUBLE PRECISION,
+    mass_earth_masses DOUBLE PRECISION,
+    radius_km DOUBLE PRECISION,
+
+    metadata JSONB,
+    UNIQUE(source_file_id, original_body_id)
+);
+
+-- Routes between star systems
+CREATE TABLE routes (
+    id SERIAL PRIMARY KEY,
+    source_file_id INTEGER REFERENCES source_files(id),
+    original_route_id INTEGER,
+    name TEXT,
+    from_system_id INTEGER REFERENCES star_systems(id) ON DELETE CASCADE,
+    to_system_id INTEGER REFERENCES star_systems(id) ON DELETE CASCADE,
+    distance_ly DOUBLE PRECISION,
+    color TEXT,
+    metadata JSONB,
+    UNIQUE(source_file_id, original_route_id)
+);
+
+-- Route waypoints for detailed paths
+CREATE TABLE route_waypoints (
+    id SERIAL PRIMARY KEY,
+    route_id INTEGER REFERENCES routes(id) ON DELETE CASCADE,
+    sequence INTEGER,
+    position GEOMETRY(PointZ, 4326),
+    x DOUBLE PRECISION,
+    y DOUBLE PRECISION,
+    z DOUBLE PRECISION,
+    label TEXT,
+    UNIQUE(route_id, sequence)
+);
+
+-- Spatial indices for fast 3D queries
+CREATE INDEX idx_star_position ON star_systems USING GIST(position);
+CREATE INDEX idx_star_source ON star_systems(source_file_id);
+CREATE INDEX idx_star_coords ON star_systems(x, y, z);
+
+CREATE INDEX idx_planet_star ON planets(star_system_id);
+CREATE INDEX idx_planet_source ON planets(source_file_id);
+
+CREATE INDEX idx_moon_planet ON moons(planet_id);
+CREATE INDEX idx_moon_system ON moons(star_system_id);
+
+CREATE INDEX idx_route_from ON routes(from_system_id);
+CREATE INDEX idx_route_to ON routes(to_system_id);
+CREATE INDEX idx_route_source ON routes(source_file_id);
+
+CREATE INDEX idx_waypoint_route ON route_waypoints(route_id);
+CREATE INDEX idx_waypoint_position ON route_waypoints USING GIST(position);
+```
+
+**Migration Strategy**:
+1. Read bodies table from Astrosynthesis
+2. Identify stars (where system_id = id)
+3. Insert stars into star_systems table
+4. Identify planets (where parent_id = system_id and type indicates planet)
+5. Insert planets into planets table
+6. Identify moons (where parent_id != system_id)
+7. Insert moons into moons table
+8. Import routes table
+9. Import route_waypoints table
+10. Handle coordinate transformation if needed
+
+---
 
 ## Architecture Overview
 
@@ -500,30 +821,19 @@ Always show real 3D distances on edges - 2D distances are misleading!
 
 ---
 
-## Development Workflow
+## Git Workflow
 
-### Current Priority: Schema Discovery
-
-**Immediate Next Steps**:
-1. Set up Rust project with Cargo
-2. Add rusqlite dependency
-3. Create schema exploration tool
-4. Test with sample .AstroDB file
-5. Generate SCHEMA.md documentation
-
-### Git Workflow
-
-- `main` branch: Stable releases
-- `develop` branch: Integration branch
-- Feature branches: `feature/schema-discovery`, `feature/postgres-setup`, etc.
+- `master` branch: Main development (currently used)
+- Feature branches: `feature/postgres-setup`, `feature/data-import`, etc. (future)
 - Commit frequently with descriptive messages
+- All commits include Claude Code attribution
 
-### Testing Strategy
+## Testing Strategy
 
 - Unit tests for data transformations
-- Integration tests with sample .AstroDB files
-- Benchmark tests for layout algorithms
-- Visual regression tests for rendering
+- Integration tests with sample .AstroDB files (TotalSystem.AstroDB)
+- Benchmark tests for layout algorithms (future)
+- Visual regression tests for rendering (future)
 
 ---
 
@@ -690,6 +1000,8 @@ Design with these potential features in mind:
 
 ---
 
-**Last Updated**: 2025-10-30
-**Project Status**: Phase 1 - Schema Discovery (In Progress)
+**Last Updated**: 2025-10-30 (Session complete - Phase 1 finished)
+**Project Status**: ✅ Phase 1 Complete - Schema Discovery Implemented and Tested
+**Next Phase**: Phase 2 - PostgreSQL Setup & Data Migration
 **Repository**: https://github.com/rem5357/SolarViewer
+**Authenticated User**: rem5357
