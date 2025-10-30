@@ -2,6 +2,8 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::info;
 
+mod schema;
+
 #[derive(Parser)]
 #[command(name = "solarviewer")]
 #[command(about = "Extract and visualize stellar cartography data from Astrosynthesis", long_about = None)]
@@ -74,15 +76,21 @@ fn main() -> Result<()> {
             info!("Exploring schema of: {}", file);
             info!("Output will be written to: {}", output);
 
-            // TODO: Implement schema exploration
-            println!("Schema exploration not yet implemented");
-            println!("This will:");
-            println!("  1. Open the .AstroDB SQLite file");
-            println!("  2. Query sqlite_master for all tables");
-            println!("  3. Extract column information with PRAGMA table_info");
-            println!("  4. Discover foreign key relationships");
-            println!("  5. Sample data from each table");
-            println!("  6. Generate markdown documentation");
+            // Open database and explore schema
+            let explorer = schema::SchemaExplorer::new(&file)?;
+            info!("Connected to database");
+
+            // Discover all tables and their structure
+            let tables = explorer.explore()?;
+            info!("Discovered {} tables", tables.len());
+
+            // Generate markdown documentation
+            schema::generate_markdown(&tables, &output, &file)?;
+            info!("Schema documentation written to: {}", output);
+
+            println!("✓ Schema exploration complete!");
+            println!("  Tables discovered: {}", tables.len());
+            println!("  Documentation: {}", output);
         }
 
         Commands::Import { file, name, database } => {
