@@ -4,6 +4,7 @@ use tracing::info;
 
 mod schema;
 mod extraction;
+mod visualization;
 
 #[derive(Parser)]
 #[command(name = "solarviewer")]
@@ -76,6 +77,37 @@ enum Commands {
         /// PostgreSQL connection string
         #[arg(short, long, default_value = "postgresql://localhost/solarviewer")]
         database: String,
+    },
+
+    /// Render a star map to PNG from an Astrosynthesis file
+    Render {
+        /// Path to the .AstroDB file
+        #[arg(short, long)]
+        file: String,
+
+        /// Center star name (e.g., "Amateru")
+        #[arg(short, long)]
+        star: String,
+
+        /// Radius around center star in light-years
+        #[arg(short, long, default_value = "20")]
+        radius: f64,
+
+        /// Output PNG file path
+        #[arg(short, long, default_value = "star_map.png")]
+        output: String,
+
+        /// Image width in pixels
+        #[arg(long, default_value = "5000")]
+        width: u32,
+
+        /// Image height in pixels
+        #[arg(long, default_value = "5000")]
+        height: u32,
+
+        /// Maximum distance for star connections in light-years
+        #[arg(long, default_value = "10")]
+        connection_distance: f64,
     },
 }
 
@@ -167,6 +199,28 @@ fn main() -> Result<()> {
             println!("  2. Apply {} projection algorithm", algorithm);
             println!("  3. Resolve overlaps");
             println!("  4. Render to {}", output);
+        }
+
+        Commands::Render { file, star, radius, output, width, height, connection_distance } => {
+            info!("Rendering star map for: {}", star);
+            info!("File: {}", file);
+            info!("Radius: {} ly", radius);
+            info!("Output: {}", output);
+
+            visualization::render_star_map(
+                &file,
+                &star,
+                radius,
+                &output,
+                width,
+                height,
+                connection_distance,
+            )?;
+
+            println!("✓ Star map rendering complete!");
+            println!("  Center star: {}", star);
+            println!("  Search radius: {} ly", radius);
+            println!("  Output: {}", output);
         }
     }
 

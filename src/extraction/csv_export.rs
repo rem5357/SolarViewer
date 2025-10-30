@@ -34,8 +34,7 @@ pub fn export_stars_to_csv(stars: &[Star], output_path: &str) -> Result<()> {
             star.z,
             system_name.replace("\"", "\"\""),
             star.system_x,
-            star.system_y,
-            star.system_z
+            star.system_y
         )?;
     }
 
