@@ -41,9 +41,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [dev-dependencies]
 criterion = "0.5"
 
-[[bench]]
-name = "layout_benchmarks"
-harness = false
+# Benchmarks will be added later
+# [[bench]]
+# name = "layout_benchmarks"
+# harness = false
 
 [profile.release]
 opt-level = 3
