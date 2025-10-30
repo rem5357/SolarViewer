@@ -6,10 +6,12 @@ use serde::Serialize;
 pub struct Star {
     pub id: i32,
     pub name: String,
-    pub star_type: String,  // body_type column
-    pub size: f64,          // radius column
-    pub color: String,      // spectral type (color is derived from this)
-    pub x: f64,
+    pub spectral_type: String,  // Official astronomical classification (e.g., "G3V", "M4V")
+    pub radius_solar: f64,       // Star radius in solar radii
+    pub mass_solar: f64,         // Star mass in solar masses
+    pub luminosity_solar: f64,   // Star luminosity in solar luminosities
+    pub temperature_k: f64,      // Surface temperature in Kelvin
+    pub x: f64,                  // 3D coordinate in light-years
     pub y: f64,
     pub z: f64,
 }
@@ -28,9 +30,10 @@ impl StarReader {
 
     /// Extract all stars from the database
     /// A star is identified as a body where system_id = id (it defines its own system)
+    /// Returns stars with their spectral type, physical properties, and 3D coordinates
     pub fn read_all_stars(&self) -> SqliteResult<Vec<Star>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, body_type, radius, spectral, x, y, z
+            "SELECT id, name, spectral, radius, mass, luminosity, temp, x, y, z
              FROM bodies
              WHERE system_id = id AND parent_id = 0
              ORDER BY name"
@@ -40,12 +43,14 @@ impl StarReader {
             Ok(Star {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                star_type: row.get::<_, String>(2).unwrap_or_default(),
-                size: row.get(3)?,
-                color: row.get::<_, String>(4).unwrap_or_default(),
-                x: row.get(5)?,
-                y: row.get(6)?,
-                z: row.get(7)?,
+                spectral_type: row.get::<_, String>(2).unwrap_or_default(),
+                radius_solar: row.get(3)?,
+                mass_solar: row.get(4)?,
+                luminosity_solar: row.get(5)?,
+                temperature_k: row.get(6)?,
+                x: row.get(7)?,
+                y: row.get(8)?,
+                z: row.get(9)?,
             })
         })?;
 
