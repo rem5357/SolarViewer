@@ -1000,8 +1000,211 @@ Design with these potential features in mind:
 
 ---
 
-**Last Updated**: 2025-10-30 (Session complete - Phase 1 finished)
-**Project Status**: ✅ Phase 1 Complete - Schema Discovery Implemented and Tested
-**Next Phase**: Phase 2 - PostgreSQL Setup & Data Migration
+## Session 2025-10-30 (Continued) - Phase 2: 2D Star Map Visualization
+
+### Accomplishments
+
+#### Initial Visualization Implementation
+- [x] Created `src/visualization/mod.rs` module structure
+- [x] Implemented `src/visualization/projection.rs`:
+  - Orthographic projection (drops Z coordinate)
+  - Automatic scaling to fit output dimensions
+  - Overlap resolution using iterative repulsive forces
+- [x] Implemented `src/visualization/renderer.rs`:
+  - PNG image generation using `image` and `imageproc` crates
+  - Star sizing based on luminosity (cube root scaling)
+  - Connection line drawing between nearby stars
+  - Circle-based star symbols
+- [x] Created `render` CLI subcommand with configurable parameters
+- [x] Tested with Amateru region: 15 stars within 20 ly, 49 connections <10 ly
+- [x] Output: 5000×5000 PNG with black background
+
+#### Enhanced Visualization (Spectral Colors & Glows)
+- [x] Created `src/visualization/spectral.rs`:
+  - SpectralType enum (O, B, A, F, G, K, M, Unknown)
+  - Color mapping for each spectral type matching astronomical standards
+  - Parser to convert string spectral types to enum
+- [x] Created `src/visualization/enhanced_renderer.rs`:
+  - Procedural star rendering with spectral-type colors
+  - Star glows and halos matching spectral type
+  - Distance-based connection line hierarchy
+  - Center star highlighting in gold
+  - Luminosity-based star sizing with highlights
+- [x] Updated CLI defaults:
+  - Search radius: 25 ly (up from 20)
+  - Connection distance: 7 ly (down from 10)
+- [x] Added dependencies: tiny-skia, fontdue, palette, rand_chacha
+- [x] Tested final output: 21 stars within 25 ly, 36 connections <7 ly
+
+### Visual Features Implemented
+- ✅ **Spectral Type Coloring**:
+  - O-type: Bright blue (155, 176, 255)
+  - B-type: Blue-white (170, 191, 255)
+  - A-type: White (202, 215, 255)
+  - F-type: Yellow-white (248, 247, 255)
+  - G-type: Yellow (255, 244, 234)
+  - K-type: Orange (255, 210, 161)
+  - M-type: Red-orange (255, 204, 111)
+- ✅ **Procedural Star Rendering**:
+  - Colored glows matching spectral type
+  - White highlights on star centers
+  - Halos for visual depth
+  - Luminosity-based sizing
+- ✅ **Connection Lines**:
+  - <3 ly: Bright white-blue, thick
+  - 3-5 ly: Bright blue
+  - 5-7 ly: Medium blue-gray
+  - Creates visual hierarchy by distance
+- ✅ **Center Star Highlighting**: Gold color with golden glow
+- ✅ **5000×5000 PNG Output**: Professional resolution
+
+### Test Results
+- **Test File**: TotalSystem.AstroDB
+- **Test Region**: Amateru (center star)
+- **Output Files**:
+  - amateru_map.png (20 ly radius, 10 ly connections) - 528 KB
+  - amateru_enhanced.png (20 ly radius, 10 ly connections) - 571 KB
+  - amateru_final.png (25 ly radius, 7 ly connections) - 570 KB
+- **Visual Quality**: ✅ Professional appearance with proper star colors
+- **Performance**: Fast rendering (<1 second)
+
+### Known Issues & TODO for Next Session
+
+**High Priority**:
+1. ⚠️ **Star Names Not Displaying** - Need fontdue integration for text labels
+   - Currently no labels rendered on the map
+   - Need to position text below/near stars
+   - Text should match star color for consistency
+2. ⚠️ **Distance Labels Not Displaying** - Lines show no distance annotations
+   - Should show distance in ly near line midpoints
+   - Only for notable distances (< 7 ly) to avoid clutter
+3. ⚠️ **Multi-Map Database Schema** - Design Nginx/PostgreSQL improvements
+   - Need schema to store multiple star maps
+   - Each map needs: unique ID, name, original file path, filename, modification date
+   - Should support loading and switching between maps
+   - Better than current per-file approach
+
+**Medium Priority**:
+1. Improve map layout algorithm (current orthographic projection is basic)
+2. Add grid overlay option
+3. Implement zoom/pan for large maps
+4. Add legend for spectral type colors
+
+### Architecture Notes
+
+**Current Visualization Pipeline**:
+1. `StarReader` extracts all stars from .AstroDB
+2. Filter by distance to center star
+3. Convert spectral type string to SpectralType enum
+4. Project 3D coordinates to 2D using orthographic projection
+5. Resolve overlaps with repulsive forces
+6. Calculate star-to-star connections
+7. Render using EnhancedStarMapRenderer
+
+**File Structure**:
+```
+src/visualization/
+├── mod.rs                 # Module integration & render_star_map() function
+├── spectral.rs           # SpectralType enum & color mappings
+├── enhanced_renderer.rs  # PNG rendering with colors & glows
+├── renderer.rs           # Original renderer (kept for reference)
+└── projection.rs         # 2D projection & overlap resolution
+```
+
+### Lessons Learned
+
+1. **Spectral Type Coloring Makes Maps Much More Readable**
+   - The blue O-type star immediately stood out in the Amateru region
+   - Color is more intuitive than size alone for distinguishing star types
+   - Professional appearance immediately improved with proper colors
+
+2. **Visual Hierarchy by Distance is Important**
+   - Reducing connection threshold from 10 ly to 7 ly made relationships clearer
+   - Varying line opacity/width by distance helps readability
+   - Center star highlighting prevents confusion about the reference point
+
+3. **Luminosity Scaling with Cube Root Works Well**
+   - Much better distribution than linear scaling
+   - Bright and faint stars both visible without extreme size differences
+   - Matches visual perception expectations
+
+4. **Glows and Halos Add Professional Polish**
+   - Simple glow effect dramatically improves visual appeal
+   - No significant performance impact on render time
+   - Glow color matching spectral type provides additional information
+
+5. **Default Parameters Matter**
+   - 25 ly radius captures meaningful neighborhood (21 stars vs 15)
+   - 7 ly connections show only close relationships (36 vs 49 lines)
+   - Defaults should match typical use case, not extremes
+
+6. **CLI Default Values Need Careful Choice**
+   - Changing from 20→25 ly and 10→7 ly in defaults properly updated behavior
+   - Users will use defaults more than custom parameters
+   - Defaults should follow best practices discovered during testing
+
+### Git Commits This Session
+
+1. `e3a715b` - Implement Rust-based 2D star map visualization with PNG rendering
+2. `7a003e7` - Enhance star map visualization with spectral colors and glows
+
+### Next Steps for Tomorrow
+
+1. **Text Rendering** (HIGH PRIORITY)
+   - Integrate fontdue for star name labels
+   - Position text near stars, offset below or to side
+   - Match text color to star spectral color
+   - Consider font size scaling with map zoom level
+
+2. **Distance Annotations** (HIGH PRIORITY)
+   - Add distance labels on connection lines
+   - Only label "interesting" distances (< 5 ly maybe)
+   - Format: "3.2 ly" in smaller font
+   - Consider label positioning to avoid overlap
+
+3. **Multi-Map Database Design** (HIGH PRIORITY)
+   - Design PostgreSQL schema for storing multiple maps:
+     ```sql
+     CREATE TABLE maps (
+       id SERIAL PRIMARY KEY,
+       name VARCHAR(255) NOT NULL,
+       source_file_path VARCHAR(512),
+       source_filename VARCHAR(255),
+       source_file_hash VARCHAR(64),  -- For detecting changes
+       last_modified TIMESTAMP,
+       created_at TIMESTAMP DEFAULT NOW(),
+       center_star_id INT,
+       search_radius_ly DECIMAL(8,2),
+       notes TEXT
+     );
+
+     CREATE TABLE map_stars (
+       id SERIAL PRIMARY KEY,
+       map_id INT REFERENCES maps(id),
+       star_id INT,
+       star_name VARCHAR(255),
+       spectral_type CHAR(1),
+       x DECIMAL(12,6),
+       y DECIMAL(12,6),
+       z DECIMAL(12,6),
+       luminosity DECIMAL(8,4)
+     );
+
+     CREATE TABLE map_connections (
+       id SERIAL PRIMARY KEY,
+       map_id INT REFERENCES maps(id),
+       from_star_id INT,
+       to_star_id INT,
+       distance_ly DECIMAL(8,2)
+     );
+     ```
+   - Support loading/unloading maps dynamically
+   - Track original file and modification date
+
+---
+
+**Last Updated**: 2025-10-30 (Evening - Phase 2 visualization complete, enhanced with spectral colors)
+**Project Status**: ✅ Phase 2 In Progress - 2D Visualization with Spectral Colors Complete, Text Rendering and Multi-Map Support Next
+**Next Phase**: Complete text rendering, multi-map database schema design
 **Repository**: https://github.com/rem5357/SolarViewer
 **Authenticated User**: rem5357
