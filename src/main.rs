@@ -90,7 +90,7 @@ enum Commands {
         star: String,
 
         /// Radius around center star in light-years
-        #[arg(short, long, default_value = "20")]
+        #[arg(short, long, default_value = "25")]
         radius: f64,
 
         /// Output PNG file path
@@ -106,7 +106,7 @@ enum Commands {
         height: u32,
 
         /// Maximum distance for star connections in light-years
-        #[arg(long, default_value = "10")]
+        #[arg(long, default_value = "7")]
         connection_distance: f64,
     },
 }

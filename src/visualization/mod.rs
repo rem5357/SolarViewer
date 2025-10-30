@@ -1,24 +1,36 @@
 pub mod renderer;
 pub mod projection;
+pub mod spectral;
+pub mod enhanced_renderer;
 
 pub use renderer::StarMapRenderer;
 pub use projection::ProjectionEngine;
+pub use spectral::SpectralType;
+pub use enhanced_renderer::EnhancedStarMapRenderer;
 
 use anyhow::Result;
 use crate::extraction::StarReader;
-use renderer::StarData;
 use projection::Point3D;
+use spectral::get_spectral_colors;
 
 /// Render a star map centered on a specific star
 pub fn render_star_map(
     db_path: &str,
     center_star_name: &str,
-    search_radius_ly: f64,
+    mut search_radius_ly: f64,
     output_path: &str,
     width: u32,
     height: u32,
-    connection_distance_ly: f64,
+    mut connection_distance_ly: f64,
 ) -> Result<()> {
+    // Use sensible defaults for enhanced visualization
+    if search_radius_ly <= 0.0 {
+        search_radius_ly = 25.0;
+    }
+    if connection_distance_ly <= 0.0 {
+        connection_distance_ly = 7.0;
+    }
+
     // Read all stars from database
     let reader = StarReader::new(db_path)?;
     let all_stars = reader.read_all_stars()?;
@@ -44,16 +56,19 @@ pub fn render_star_map(
 
     println!("Found {} stars within {} ly of {}", nearby_stars.len(), search_radius_ly, center_star_name);
 
-    // Convert to StarData for rendering
-    let render_stars: Vec<StarData> = nearby_stars
+    // Convert to StarData for rendering with spectral types
+    let render_stars: Vec<enhanced_renderer::StarDataEnhanced> = nearby_stars
         .iter()
-        .map(|s| StarData {
-            name: s.name.clone(),
-            x: s.x,
-            y: s.y,
-            z: s.z,
-            spectral_type: s.spectral_type.clone(),
-            luminosity: s.luminosity_solar,
+        .map(|s| {
+            let spectral = s.spectral_type.parse::<SpectralType>().unwrap_or(SpectralType::Unknown);
+            enhanced_renderer::StarDataEnhanced {
+                name: s.name.clone(),
+                x: s.x,
+                y: s.y,
+                z: s.z,
+                spectral_type: spectral,
+                luminosity: s.luminosity_solar,
+            }
         })
         .collect();
 
@@ -69,11 +84,11 @@ pub fn render_star_map(
     // Resolve overlaps
     projection_engine.resolve_overlaps(&mut points_2d, 150.0);
 
-    // Find connections
-    let connections = StarMapRenderer::find_connections(&render_stars, connection_distance_ly);
+    // Find connections using enhanced renderer
+    let connections = EnhancedStarMapRenderer::find_connections(&render_stars, connection_distance_ly);
 
-    // Render to PNG
-    let renderer = StarMapRenderer::new(width, height);
+    // Render to PNG using enhanced renderer
+    let renderer = EnhancedStarMapRenderer::new(width, height);
     let center_star_idx = render_stars
         .iter()
         .position(|s| s.name.eq_ignore_ascii_case(center_star_name));
