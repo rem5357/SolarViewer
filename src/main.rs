@@ -5,6 +5,7 @@ use tracing::info;
 mod schema;
 mod extraction;
 mod visualization;
+mod stellar_forge;
 
 #[derive(Parser)]
 #[command(name = "solarviewer")]
@@ -108,6 +109,32 @@ enum Commands {
         /// Maximum distance for star connections in light-years
         #[arg(long, default_value = "7")]
         connection_distance: f64,
+    },
+
+    /// Create a new StellarForge galaxy
+    CreateGalaxy {
+        /// Name of the galaxy
+        #[arg(short, long)]
+        name: String,
+
+        /// Output file path for the galaxy data
+        #[arg(short, long, default_value = "galaxy.json")]
+        output: String,
+
+        /// Number of random systems to generate
+        #[arg(long, default_value = "100")]
+        systems: usize,
+
+        /// Random seed for generation
+        #[arg(long, default_value = "42")]
+        seed: u64,
+    },
+
+    /// Create a Sol-like system using StellarForge
+    CreateSol {
+        /// Output file path for the system data
+        #[arg(short, long, default_value = "sol_system.json")]
+        output: String,
     },
 }
 
@@ -220,6 +247,66 @@ fn main() -> Result<()> {
             println!("✓ Star map rendering complete!");
             println!("  Center star: {}", star);
             println!("  Search radius: {} ly", radius);
+            println!("  Output: {}", output);
+        }
+
+        Commands::CreateGalaxy { name, output, systems, seed } => {
+            use stellar_forge::{builders::GalaxyBuilder, storage::{StellarForgeDataset, FileStorage}};
+
+            info!("Creating new galaxy: {}", name);
+            info!("Generating {} systems with seed {}", systems, seed);
+
+            let galaxy = GalaxyBuilder::new(&name)
+                .with_size(100000.0, 100000.0, 1000.0)
+                .with_random_systems(systems, seed)
+                .build();
+
+            let mut dataset = StellarForgeDataset::new(galaxy);
+            dataset.metadata.name = name.clone();
+            dataset.metadata.description = Some(format!("Generated galaxy with {} systems", systems));
+            dataset.update_statistics();
+
+            FileStorage::save_json(&dataset, &output)?;
+
+            println!("✓ Galaxy creation complete!");
+            println!("  Galaxy name: {}", name);
+            println!("  Systems generated: {}", systems);
+            println!("  Total stars: {}", dataset.metadata.statistics.total_stars);
+            println!("  Output: {}", output);
+        }
+
+        Commands::CreateSol { output } => {
+            use stellar_forge::{
+                builders::create_sol_like_system,
+                containers::Galaxy,
+                storage::{StellarForgeDataset, FileStorage},
+                services::StellarForgeService,
+            };
+
+            info!("Creating Sol-like system");
+
+            // Create the Sol system
+            let sol_system = create_sol_like_system()
+                .at_position(8000.0, 0.0, 0.0)  // ~8 kpc from galactic center
+                .build();
+
+            // Create a galaxy and add the system
+            let mut galaxy = Galaxy::new("Milky Way");
+            galaxy.add_star_system(sol_system)?;
+
+            // Create dataset
+            let mut dataset = StellarForgeDataset::new(galaxy);
+            dataset.metadata.name = "Sol System".to_string();
+            dataset.metadata.description = Some("Sol system with all planets and major moons".to_string());
+            dataset.update_statistics();
+
+            // Save to file
+            FileStorage::save_json(&dataset, &output)?;
+
+            println!("✓ Sol system creation complete!");
+            println!("  Stars: {}", dataset.metadata.statistics.total_stars);
+            println!("  Planets: {}", dataset.metadata.statistics.total_planets);
+            println!("  Moons: {}", dataset.metadata.statistics.total_moons);
             println!("  Output: {}", output);
         }
     }

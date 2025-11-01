@@ -11,6 +11,10 @@ repository = "https://github.com/rem5357/SolarViewer"
 name = "solarviewer"
 path = "src/main.rs"
 
+[[bin]]
+name = "stellarforge"
+path = "src/bin/stellarforge.rs"
+
 [dependencies]
 # SQLite access for Astrosynthesis .AstroDB files
 rusqlite = { version = "0.31", features = ["bundled"] }
@@ -37,9 +41,27 @@ nalgebra = "0.32"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+env_logger = "0.11"
 
 # Date/Time for documentation timestamps
 chrono = "0.4"
+time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
+
+# UUID for unique identifiers
+uuid = { version = "1.5", features = ["v4", "serde"] }
+
+# Error handling
+thiserror = "1.0"
+
+# Random number generation
+rand = "0.8"
+
+# Async for database operations
+async-trait = "0.1"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "time", "json", "chrono"] }
+
+# Binary serialization (optional)
+bincode = { version = "1.3", optional = true }
 
 # Image rendering for star maps
 image = "0.24"
@@ -56,6 +78,10 @@ palette = "0.7"
 
 # Deterministic random for procedural generation
 rand_chacha = "0.3"
+
+[features]
+default = []
+binary = ["bincode"]
 
 [dev-dependencies]
 criterion = "0.5"

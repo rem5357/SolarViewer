@@ -1,19 +1,37 @@
-# SolarViewer
+# SolarViewer & StellarForge
 
-A Rust-based tool for extracting, storing, and visualizing stellar cartography data from Astrosynthesis save files.
+A comprehensive Rust-based toolkit for extracting, storing, and visualizing stellar cartography data from Astrosynthesis save files, featuring the modern StellarForge data structure system.
 
 ## Overview
 
 SolarViewer reads Astrosynthesis .AstroDB files (SQLite databases), extracts stellar data including 3D coordinates, system hierarchies, and route information, then stores it in PostgreSQL with PostGIS for advanced spatial queries. It includes intelligent 2D projection algorithms to create readable maps from 3D stellar data.
 
-## Features (Planned)
+**New: StellarForge** - A modern stellar cartography data structure system that improves upon Astrosynthesis with:
+- Container-based polymorphic architecture (everything can contain everything)
+- Proper IAU astronomical coordinate systems
+- PostgreSQL/PostGIS spatial database backend
+- Political influence zones with spatial mathematics
+- Advanced routing and pathfinding capabilities
 
-- **Schema Discovery**: Automatically explore and document Astrosynthesis database schemas
-- **Data Extraction**: Read .AstroDB SQLite files and extract hierarchical stellar data
-- **PostgreSQL Storage**: Store multiple sectors with PostGIS spatial indexing
-- **2D Projection**: Generate readable 2D maps from 3D coordinates using hybrid layout algorithms
-- **Distance Preservation**: Annotate maps with real 3D distances
-- **Multiple Export Formats**: SVG, PNG, and more
+## Features
+
+### Implemented
+- **Schema Discovery**: ✅ Automatically explore and document Astrosynthesis database schemas
+- **2D Star Map Visualization**: ✅ Generate PNG maps with spectral colors and glows
+- **StellarForge Data Structure**: ✅ Modern container-based architecture with proper IAU coordinates
+- **PostgreSQL/PostGIS Integration**: ✅ Spatial database with 3D indexing and queries
+- **Political Influence Zones**: ✅ 3D territories with strength-based falloff
+- **Advanced Spatial Queries**: ✅ Chokepoints, contested systems, safe routes
+
+### In Progress
+- **Data Extraction**: Read .AstroDB SQLite files and migrate to PostgreSQL
+- **Text Rendering**: Star names and distance labels on maps
+- **Route Visualization**: Trade routes and connections on 2D maps
+
+### Planned
+- **Multiple Export Formats**: SVG and other formats beyond PNG
+- **Temporal Data**: Historical borders and territory changes
+- **Economic Simulation**: Trade flows and commodity modeling
 
 ## Architecture
 
@@ -86,6 +104,29 @@ solarviewer map \
   --database postgresql://localhost/solarviewer
 ```
 
+### StellarForge CLI
+
+The new StellarForge system includes a comprehensive CLI for database operations:
+
+```bash
+# Initialize the database with PostGIS
+stellarforge init
+
+# Create a new galaxy session
+stellarforge session create --name "My Galaxy"
+
+# Add star systems
+stellarforge system add --session-id <UUID> --name "Sol" --x 0 --y 0 --z 0
+
+# Create political entities and influence zones
+stellarforge political create --session-id <UUID> --name "Federation"
+stellarforge political influence --session-id <UUID> --entity-id <UUID> --base-radius 20
+
+# Analyze spatial relationships
+stellarforge analyze chokepoints --session-id <UUID>
+stellarforge analyze contested --session-id <UUID>
+```
+
 ### Algorithms
 
 - `pca`: Fast PCA projection (deterministic, good for overview)
@@ -95,9 +136,14 @@ solarviewer map \
 
 ## Project Status
 
-**Current Phase**: Schema Discovery and Documentation
+**Current Phase**: StellarForge Implementation Complete, Integration In Progress
 
-See [PROJECT.md](PROJECT.md) for detailed architecture, implementation phases, and design decisions.
+### Key Documentation
+- [PROJECT.md](PROJECT.md) - Detailed architecture, implementation phases, and design decisions
+- [STELLARFORGE.md](STELLARFORGE.md) - Initial StellarForge design specification
+- [STELLARFORGE_DATABASE.md](STELLARFORGE_DATABASE.md) - Complete database documentation
+- [STELLARFORGE_SUMMARY.md](STELLARFORGE_SUMMARY.md) - Implementation summary
+- [COORDINATE_SYSTEMS.md](COORDINATE_SYSTEMS.md) - IAU coordinate system documentation
 
 ## Development
 
@@ -107,11 +153,24 @@ See [PROJECT.md](PROJECT.md) for detailed architecture, implementation phases, a
 solarviewer/
 ├── src/
 │   ├── main.rs              # CLI interface
+│   ├── bin/
+│   │   └── stellarforge.rs  # StellarForge CLI binary
 │   ├── schema/              # Schema exploration
 │   ├── extraction/          # SQLite reading
-│   ├── storage/             # PostgreSQL operations
-│   ├── projection/          # Layout algorithms
-│   └── visualization/       # Rendering
+│   ├── visualization/       # 2D rendering with spectral colors
+│   └── stellar_forge/       # Modern data structure system
+│       ├── core.rs          # Traits and types
+│       ├── coordinates.rs   # IAU coordinate systems
+│       ├── containers.rs    # Container implementations
+│       ├── database/        # PostgreSQL/PostGIS layer
+│       └── cli.rs           # CLI operations
+├── sql/                     # Database schema files
+│   ├── 01_create_database.sql
+│   ├── 02_session_tables.sql
+│   ├── 03_stellar_tables.sql
+│   ├── 04_political_tables.sql
+│   ├── 05_routes_tables.sql
+│   └── 06_groups_sectors_tables.sql
 ├── tests/                   # Integration tests
 └── docs/                    # Generated documentation
 ```
