@@ -2,6 +2,9 @@
 
 use anyhow::Result;
 
+// Import the library crate
+extern crate solarviewer;
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Enable logging

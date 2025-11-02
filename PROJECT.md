@@ -1704,7 +1704,429 @@ psql -U postgres -d stellarforge -f sql/01_create_database.sql
 ---
 
 **Last Updated**: 2025-11-01 (Evening - Documentation Organization & Roadmap)
-**Project Status**: Phase 1 Complete, Phase 2 In Progress
-**Next Session Focus**: Text rendering for star maps, database integration testing, multi-map management
+**Project Status**: Phase 2 Complete - Polymorphic Database Schema Implemented, Planet/Moon Import Working
+**Next Session Focus**: Blazor WASM frontend development to visualize imported data
+
+---
+
+## Session 2025-11-01 (Continued) - Phase 2: Polymorphic Database Schema & Planet/Moon Import
+
+**Session Date**: 2025-11-01 (evening)
+**Duration**: ~3 hours
+**Focus**: Fix database architecture, implement proper polymorphic schema, fix planet/moon import
+
+### Major Accomplishments
+
+#### 1. Identified Critical Database Architecture Flaw ✅
+
+**Problem Discovered**:
+- Original schema had `stellar.star_systems` table with `spectral_class` and `mass_solar` columns
+- Star systems should be **containers only** (just position), not have stellar properties
+- Stars should be separate entities in their own table
+- This was mixing the concept of "system" (container) with "star" (astronomical body)
+
+**Root Cause**: Single Table Inheritance pattern with JSONB `physical_properties` blob
+- Wasted columns (stars don't need orbital parameters, planets don't need spectral class)
+- Poor queryability (can't query `WHERE mass > 2` because it's in JSONB)
+- Violated normalized database design principles
+
+#### 2. Designed & Implemented Polymorphic Database Schema ✅
+
+**Decision**: Class Table Inheritance pattern
+- Each astronomical body type gets its own table with appropriate columns
+- Eliminates NULL waste
+- Enables proper SQL queries and constraints
+- Follows astronomical hierarchy naturally
+
+**Created**: `sql/07_refactor_bodies.sql` (395 lines)
+
+**New Tables**:
+```sql
+stellar.stars (
+    id UUID PRIMARY KEY,
+    session_id UUID,
+    system_id UUID REFERENCES stellar.star_systems(id),
+    parent_star_id UUID REFERENCES stellar.stars(id),  -- For binary/multiple systems
+    name VARCHAR(255),
+    spectral_class VARCHAR(20) NOT NULL,
+    mass_solar NUMERIC NOT NULL CHECK (mass_solar > 0),
+    radius_solar NUMERIC CHECK (radius_solar > 0),
+    luminosity_solar NUMERIC NOT NULL CHECK (luminosity_solar > 0),
+    temperature_k NUMERIC NOT NULL CHECK (temperature_k > 0),
+    -- Orbital elements for binary/multiple systems
+    semi_major_axis_au NUMERIC,
+    eccentricity NUMERIC CHECK (eccentricity >= 0 AND eccentricity < 1),
+    orbital_period_days NUMERIC,
+    position_relative GEOMETRY(PointZ, 4326),
+    position_absolute GEOMETRY(PointZ, 4326),
+    ...
+);
+
+stellar.planets (
+    id UUID PRIMARY KEY,
+    session_id UUID,
+    system_id UUID,
+    parent_star_id UUID NOT NULL REFERENCES stellar.stars(id),
+    name VARCHAR(255),
+    planet_type VARCHAR(50) NOT NULL,
+    mass_earth NUMERIC CHECK (mass_earth > 0),
+    radius_earth NUMERIC NOT NULL CHECK (radius_earth > 0),
+    -- Required orbital elements
+    semi_major_axis_au NUMERIC NOT NULL CHECK (semi_major_axis_au > 0),
+    eccentricity NUMERIC NOT NULL CHECK (eccentricity >= 0 AND eccentricity < 1),
+    orbital_period_days NUMERIC NOT NULL CHECK (orbital_period_days > 0),
+    -- Atmosphere & habitability
+    has_atmosphere BOOLEAN,
+    atmosphere_composition JSONB,
+    in_habitable_zone BOOLEAN,
+    surface_water_percent NUMERIC,
+    ...
+);
+
+stellar.moons (
+    id UUID PRIMARY KEY,
+    session_id UUID,
+    system_id UUID,
+    parent_planet_id UUID NOT NULL REFERENCES stellar.planets(id),
+    name VARCHAR(255),
+    semi_major_axis_km NUMERIC NOT NULL CHECK (semi_major_axis_km > 0),
+    tidally_locked BOOLEAN DEFAULT true,
+    subsurface_ocean BOOLEAN,
+    ...
+);
+
+stellar.orbital_objects (
+    id UUID PRIMARY KEY,
+    object_type VARCHAR(50) NOT NULL,  -- asteroid, station, wreck, belt
+    parent_star_id UUID REFERENCES stellar.stars(id),
+    parent_planet_id UUID REFERENCES stellar.planets(id),
+    parent_moon_id UUID REFERENCES stellar.moons(id),
+    CONSTRAINT has_one_parent CHECK (
+        (parent_star_id IS NOT NULL)::integer +
+        (parent_planet_id IS NOT NULL)::integer +
+        (parent_moon_id IS NOT NULL)::integer = 1
+    )
+);
+
+stellar.interstellar_objects (
+    id UUID PRIMARY KEY,
+    object_type VARCHAR(50) NOT NULL,  -- rogue_planet, nebula, station
+    position_galactic GEOMETRY(PointZ, 4326) NOT NULL,
+    velocity_xyz NUMERIC[3],
+    ...
+);
+```
+
+**Key Design Features**:
+- Proper CHECK constraints for data validation
+- Hierarchical parent relationships (stars can orbit stars, planets orbit stars, moons orbit planets)
+- Type-specific columns (no wasted NULLs)
+- JSONB only for truly variable metadata
+- Comprehensive indexes for common queries
+- Support for complex systems (binary stars, Jupiter-like mini systems)
+
+#### 3. Updated Import Tool for New Schema ✅
+
+**Modified**: `src/bin/astro_import.rs` (lines 158-498)
+
+**Changes to `import_stars()` function**:
+- Now inserts into `stellar.stars` table instead of old `bodies` table
+- Stores proper typed columns: `spectral_class`, `mass_solar`, `luminosity_solar`, `temperature_k`
+- Handles invalid temperature values (0 → 5778K default)
+- Creates star_systems as containers only
+
+**Before**:
+```rust
+// Old: Stored in JSONB
+let physical = serde_json::json!({
+    "mass_solar": mass,
+    "spectral_class": spectral
+});
+INSERT INTO stellar.bodies (physical_properties) VALUES (...)
+```
+
+**After**:
+```rust
+// New: Proper typed columns
+INSERT INTO stellar.stars (
+    spectral_class, mass_solar, radius_solar,
+    luminosity_solar, temperature_k, position_absolute
+) VALUES ($1, $2, $3, $4, $5, ST_MakePoint($6, $7, $8))
+```
+
+#### 4. Fixed Planet & Moon Import Logic ✅
+
+**Critical Discovery**:
+Astrosynthesis doesn't use `body_type` field to distinguish planets/moons!
+- Most bodies have `body_type = ""` (empty string)
+- **7,902 bodies** with empty `body_type` in TestAlpha.AstroDB
+- Uses **hierarchical parent relationships** instead
+
+**Diagnostic Tool Created**: `src/bin/check_bodies.rs`
+- Revealed that Astrosynthesis uses parent hierarchy:
+  - Stars have `spectral != NULL`
+  - Planets have `parent_id` pointing to a star
+  - Moons have `parent_id` pointing to a planet
+
+**Complete Rewrite of `import_bodies()` function** (lines 331-498):
+
+```rust
+// Step 1: Build map of star IDs (bodies with spectral class)
+let star_astro_ids: HashSet<i64> = sqlite.prepare(
+    "SELECT id FROM Bodies WHERE spectral IS NOT NULL AND spectral != ''"
+)?;
+
+// Step 2: Import planets (bodies whose parent is a star)
+for (astro_id, parent_id, name, mass, radius, temp) in &bodies {
+    if star_astro_ids.contains(parent_id) {
+        // This is a planet - parent is a star
+        INSERT INTO stellar.planets (parent_star_id, ...) VALUES (...)
+        planet_map.insert(astro_id, planet_id);
+    }
+}
+
+// Step 3: Import moons (bodies whose parent is a planet)
+for (parent_id, name, mass, radius, temp) in &bodies {
+    if planet_map.contains_key(parent_id) {
+        // This is a moon - parent is a planet
+        INSERT INTO stellar.moons (parent_planet_id, ...) VALUES (...)
+    }
+}
+```
+
+**Data Validation Added**:
+- Mass/radius = 0 → use sensible defaults (1 Earth mass/radius for planets, Moon values for moons)
+- Prevents CHECK constraint violations
+- Ensures data integrity
+
+#### 5. Successful Import Results ✅
+
+**TestAlpha.AstroDB** (final import):
+- ✅ **264 star systems** (134 single + 130 multi-star)
+- ✅ **417 stars** total
+- ✅ **2,029 planets** (was 0 before fix!)
+- ✅ **5,376 moons** (was 0 before fix!)
+
+**Verification Example** - System "S 00 00 07":
+- Star: S 00 00 07 (MV spectral class)
+- Planets: Mikurara, Like Alpha
+- Moons: Mikurara.1, Smaller Bodies
+- ✅ Matches screenshot from Astrosynthesis perfectly!
+
+### Files Created/Modified This Session
+
+**New Files**:
+- `sql/07_refactor_bodies.sql` - Polymorphic schema (5 new tables)
+- `src/bin/check_bodies.rs` - Diagnostic tool for inspecting Astrosynthesis data
+- `check_bodies.rs` (root) - Temporary diagnostic script (can be deleted)
+
+**Modified Files**:
+- `src/bin/astro_import.rs` (331-498) - Complete rewrite of import_bodies()
+  - Changed star import to use stellar.stars table
+  - Rewrote planet detection logic (parent hierarchy instead of body_type)
+  - Rewrote moon detection logic
+  - Added data validation for mass/radius
+
+**Database Schema Changes**:
+- Applied `sql/07_refactor_bodies.sql` to stellarforge database
+- Created 5 new tables: stars, planets, moons, orbital_objects, interstellar_objects
+- Old `stellar.bodies` table still exists but is no longer used
+
+### Lessons Learned
+
+#### 1. Database Architecture is Critical
+**Issue**: Started with Single Table Inheritance (generic `bodies` table with JSONB)
+**Problem**:
+- Can't query structured data in JSONB efficiently
+- Wasted columns (planets had spectral_class = NULL)
+- Poor data integrity (no constraints on JSONB contents)
+
+**Solution**: Class Table Inheritance
+- Each body type gets its own table
+- Proper typed columns
+- Database-level constraints
+- Better query performance
+
+**Takeaway**: For well-defined domain models like astronomy, use proper tables instead of document-style JSONB blobs.
+
+#### 2. Don't Assume Source Data Has Obvious Type Fields
+**Assumption**: Astrosynthesis would have `body_type = "planet"` or `"moon"`
+**Reality**: Most bodies have `body_type = ""` (empty)
+**Solution**: Infer type from parent relationships and presence/absence of fields (spectral class)
+
+**Takeaway**: Always inspect the actual data, not just the schema. Use diagnostic tools to understand the data model.
+
+#### 3. Handle Invalid Data Gracefully
+**Issue**: Many bodies had `mass = 0` or `radius = 0`
+**Problem**: Violated CHECK constraints (`mass > 0`)
+**Solution**: Use sensible defaults based on body type:
+- Stars: 5778K (Sun's temperature)
+- Planets: 1 Earth mass/radius
+- Moons: Luna's mass/radius
+
+**Takeaway**: Real-world data is messy. Build validation and default value logic.
+
+#### 4. Hierarchical Data Requires Multiple Passes
+**Challenge**: Moons reference planets, planets reference stars
+**Solution**: Import in order:
+1. Star systems (containers)
+2. Stars
+3. Planets (track IDs in map)
+4. Moons (use planet map)
+
+**Takeaway**: Build ID mapping structures (Astro ID → PostgreSQL UUID) for cross-table references.
+
+#### 5. Diagnostic Tools Save Time
+Created `check_bodies.rs` to inspect TestAlpha.AstroDB:
+```
+=== Distinct body_type values ===
+  - ''                    (7902 bodies!)
+  - 'Brown Dwarf'         (51)
+  - 'Space Station'       (3)
+  ...
+
+=== Non-star bodies (parent_id != 0) ===
+  Total: 7925
+```
+
+This immediately revealed that `body_type` field was unreliable.
+
+**Takeaway**: When debugging data issues, write small inspection tools first.
+
+### Known Issues & Limitations
+
+1. **Temperature Data Quality**
+   - Many stars have `temp = 0` in source data
+   - Currently default to 5778K (Sun's temperature)
+   - TODO: Estimate temperature from spectral class
+     - M-class: ~3000K
+     - G-class: ~5500-6000K
+     - O-class: ~30000K+
+
+2. **Orbital Elements Missing**
+   - Astrosynthesis doesn't store semi_major_axis, eccentricity, etc.
+   - Currently using placeholder values (1.0 AU, 0.0 eccentricity, 365 days period)
+   - TODO: Calculate from 3D positions if needed
+
+3. **Planet Type Classification**
+   - All planets imported as 'terrestrial'
+   - Astrosynthesis may have size/type hints in other fields
+   - TODO: Classify as gas_giant, ice_giant, super_earth based on mass/radius
+
+4. **Old `stellar.bodies` Table**
+   - Still exists in database but is unused
+   - TODO: Drop table once fully migrated
+
+5. **Coordinate Conversion**
+   - Currently using simple axis swap (Astro Z,X,Y → Galactic X,Y,Z)
+   - TODO: Verify this is correct for all cases
+
+### Next Session TODO
+
+#### Immediate Tasks (Blazor Frontend Prep)
+
+**Goal**: Create Blazor WASM frontend to view imported data
+
+1. **Setup Blazor Project**
+   - [ ] Install .NET 8 SDK (if not already installed)
+   - [ ] Create new Blazor WASM project: `dotnet new blazorwasm -o StellarForge.Web`
+   - [ ] Test basic Blazor app runs
+
+2. **Create Rust API Backend**
+   - [ ] Add Axum web framework to Cargo.toml
+   - [ ] Create `src/api/mod.rs` with REST endpoints:
+     - `GET /api/sessions` - List all import sessions
+     - `GET /api/systems?session_id={id}` - List star systems
+     - `GET /api/systems/{id}` - Get system details with stars/planets/moons
+     - `GET /api/stars?session_id={id}` - List all stars
+     - `GET /api/stats?session_id={id}` - Get statistics
+   - [ ] Add CORS middleware for Blazor
+   - [ ] Test endpoints with curl/Postman
+
+3. **Basic Blazor UI**
+   - [ ] Session selector component
+   - [ ] Star systems list view
+   - [ ] System detail view showing:
+     - Star(s) with spectral class, mass, luminosity
+     - Planets with names, types, sizes
+     - Moons count
+   - [ ] Statistics dashboard (counts, charts)
+
+4. **Testing with Current Data**
+   - [ ] Load TestAlpha.AstroDB session
+   - [ ] Verify 264 systems, 417 stars, 2029 planets, 5376 moons display correctly
+   - [ ] Test clicking through system hierarchy
+
+#### Database Cleanup
+
+- [ ] Drop old `stellar.bodies` table: `DROP TABLE stellar.bodies CASCADE;`
+- [ ] Update any remaining references in code
+- [ ] Run vacuum/analyze on PostgreSQL
+
+#### Future Enhancements
+
+- [ ] Spectral-based temperature estimation
+- [ ] Planet type classification (gas giant vs terrestrial)
+- [ ] Calculate orbital elements from positions
+- [ ] Import routes/wormholes
+- [ ] 2D star map visualization in Blazor
+- [ ] Political entity support
+- [ ] Sector/group management
+
+### Technical Architecture Notes
+
+**Current Stack**:
+- **Database**: PostgreSQL 18 + PostGIS
+  - Host: localhost:5432
+  - Database: stellarforge
+  - User: postgres
+  - Password: Beta5357
+- **Backend**: Rust
+  - Importers: `astro-import` binary
+  - Future: Axum REST API
+- **Frontend**: Blazor WASM (to be created)
+  - C# .NET 8
+  - Talks to Rust API via HTTP
+
+**Data Flow**:
+```
+Astrosynthesis .AstroDB (SQLite)
+    ↓ (astro-import)
+PostgreSQL StellarForge DB
+    ↓ (Axum REST API)
+Blazor WASM Frontend
+```
+
+**Deployment Architecture** (Future Phase 3):
+```
+Nginx Reverse Proxy
+    ├─→ Blazor WASM (static files)
+    └─→ Rust API (Axum backend)
+           └─→ PostgreSQL
+```
+
+### Session Statistics
+
+**Lines of Code Changed**: ~350
+**New Files Created**: 3
+**Database Tables Created**: 5
+**Time Debugging Planet Import**: ~1.5 hours
+**Aha Moments**: 2 (hierarchical parent structure, body_type field unreliable)
+**Commits This Session**: TBD (will commit after updating PROJECT.md)
+
+### Git Commits This Session
+
+Will include:
+1. `Add polymorphic database schema (07_refactor_bodies.sql)` - 5 new tables for Class Table Inheritance
+2. `Rewrite import_bodies to detect planets/moons by parent hierarchy` - Fix planet/moon detection logic
+3. `Add data validation for mass/radius in import` - Handle zero/invalid values
+4. `Add diagnostic tool check_bodies.rs` - Inspect Astrosynthesis data structure
+5. `Update PROJECT.md with Session 2025-11-01 evening notes` - This documentation
+
+---
+
+**Project Status**: Phase 2 Complete - Polymorphic Database Schema Implemented & Working
+**Next Session Focus**: Blazor WASM frontend development, Rust REST API, data visualization
+**Ready for**: Full-stack development with real imported data!
 **Repository**: https://github.com/rem5357/SolarViewer
 **Authenticated User**: rem5357

@@ -14,6 +14,7 @@ pub mod builders;
 pub mod storage;
 pub mod database;
 pub mod cli;
+pub mod import;
 
 // Re-export main types for convenience
 pub use self::core::*;

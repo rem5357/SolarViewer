@@ -395,23 +395,19 @@ pub async fn run_cli() -> Result<()> {
         }
 
         Commands::Import { session_name, file, convert_coordinates } => {
-            println!("Importing from Astrosynthesis file: {}", file);
+            use crate::stellar_forge::import::{AstrosynthesisImporter, ImportConfig};
 
-            // Create import session
-            let repo = SessionRepository::new(&pool);
-            let session_id = repo.create_session(
-                &session_name,
-                Some(&format!("Import from {}", file)),
-                "import"
-            ).await?;
+            let config = ImportConfig {
+                database_url: db_url.clone(),
+                session_name: Some(session_name),
+                convert_coordinates,
+                import_routes: true,
+            };
 
-            println!("Created import session: {}", session_id);
+            let mut importer = AstrosynthesisImporter::new(&file, config)?;
+            let stats = importer.import().await?;
 
-            // Here you would integrate with the Astrosynthesis import code
-            // For now, just show the session ID
-            if convert_coordinates {
-                println!("Will convert from Astrosynthesis coordinate system to IAU Galactic");
-            }
+            println!("\n✅ Import complete!");
         }
 
         Commands::System { action } => {
